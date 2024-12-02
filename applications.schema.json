@@ -1,0 +1,419 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://entur.no/schemas/applications.schema.json",
+  "title": "App factory schema",
+  "description": "This is the schema for App factory",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "apiVersion": {
+      "description": "Specifies the API version for use by the parser interpreting the manifest",
+      "type": "string",
+      "const": "entur.io/v1alpha1"
+    },
+    "kind": {
+      "description": "The kind of manifest",
+      "type": "string",
+      "const": "GoogleCloudApplication"
+    },
+    "metadata": {
+      "description": "This block specs required metadata used in naming, labelling etc.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "App ID  (immutable)",
+          "description": "The `id` value should be an easily recognizable string restricted to 10 characters in length. Only alphanum, no special characters. It's used to uniquely identify resources related to an app, as well as in resource names with conservative naming restrictions, such as the GCP project.",
+          "type": "string",
+          "allOf": [
+            { "pattern": "^(?!-)^[a-z0-9-]+(?<!-)$" },
+            { "pattern": "^(?!ent-).*" },
+            { "pattern": "^(?!.*(sbx|dev|tst|prd)).*" },
+            { "maxLength": 10 },
+            { "minLength": 3 }
+          ]
+        },
+        "displayName": {
+          "title": "Display name",
+          "description": "A short description of the application (i.e. full name and any additional info useful to developers).",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "description": "A slightly richer identifier for humans and computers to use day-to-day. Is used as the app label, as well as Kubernetes namespace naming, etc. !!Beware!! that changes to this might trigger some destructive changes, such as renaming of Kubernetes namespaces.",
+          "type": "string",
+          "allOf": [
+            { "pattern": "^(?!-)^[a-z0-9-]+(?<!-)$" },
+            { "pattern": "^(?!ent-).*" },
+            { "pattern": "^(?!.*(sbx|dev|tst|prd)).*" },
+            { "maxLength": 30 },
+            { "minLength": 3 }
+          ]
+        },
+        "owner": {
+          "title": "Owner",
+          "description": "As per now, the `owner` of an application must always be a team. The name of the `owner` must match a pre-existing team. To check if the team exists, and what it's called, check under the `teams/` folder structure in the GCP console.",
+          "type": "string"
+        },
+        "domain": {
+          "title": "Domain",
+          "description": "Set to what category the application fits in. I.e. applications handling ticket sales, might fit best under the `sales` domain.",
+          "type": "string"
+        },
+        "trigger": {
+          "title": "The 'trigger' attribute",
+          "description": "Triggers a new run when updated. Value is a UNIX timestamp. When creating a new application manifest based on an existing manifest, you can keep the same value or add a random value.",
+          "type": "integer"
+        }
+      },
+      "required": ["id", "displayName", "name", "owner", "domain", "trigger"]
+    },
+    "spec": {
+      "description": "The 'spec' block is where most of the magic happens.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "destroy": {
+          "title": "Destroy",
+          "description": "Can be set to `true` if you want to instruct App Factory to destroy the application.",
+          "type": "boolean"
+        },
+        "organization": {
+          "description": "Should always be set to `entur`.",
+          "type": "string",
+          "const": "entur"
+        },
+        "environments": {
+          "description": "A list of environments in which you want the application projects and Kubernetes resources to be provisioned./nIn order to be able to provision an application in an environment, it must have been made available to the team (i.e. the `owner`). You can check which environments exist by checking the folder structure under the team's folder./nIn order to provision an application in the `dev` environment, the folder `dev` must exist, etc./nIf an environment is missing, reach out Team Plattform.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "appEngine": {
+          "title": "AppEngine",
+          "description": "App Engine configuration parameters. This bootstraps the use of App Engine and can configure the database type.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "title": "Enable App Engine",
+              "description": "If App Engine is used, set this to have the GCP project bootstrapped with necessary defaults.",
+              "type": "boolean",
+              "default": false
+            },
+            "databaseType": {
+              "title": "App Engine Database Type",
+              "description": "Which database engine type to use. This can only be set upon project creation, and cannot be updated post creation. Supported values are `firestore` or `datastore`.",
+              "type": "string",
+              "enum": ["firestore", "datastore"],
+              "default": "firestore"
+            }
+          },
+          "required": []
+        },
+        "appLogBucket": {
+          "title": "AppLogBucket",
+          "description": "For long-term storage of (Kubernetes) logs. This is for special cases where the default log retention of the shared Stackdriver project is insufficient (30d). Log sinks and storage cost money, so this should only be enabled when necessary. Note that pods must have the label `\"k8s-pod/customLogRetention\"=\"enabled\"`.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "title": "Enable separate log sink for application",
+              "description": "Provisions a Cloud Storage bucket in the application GCP project, and sets up sink filters that forward application logs to this bucket.",
+              "type": "boolean",
+              "default": false
+            },
+            "retentionDays": {
+              "title": "Log sink retention (days)",
+              "description": "How many days to keep logs forwarded by the log sink.",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 3650,
+              "default": 30
+            },
+            "disableSink": {
+              "title": "Disable sink",
+              "description": "Whether to disable the log sink.",
+              "type": "boolean",
+              "default": false
+            },
+            "logAnalytics": {
+              "title": "Enable Log Analytics",
+              "description": "Enable Log Analytics on the log bucket to be able to write you own SQL queries on the logs in the log bucket.",
+              "type": "boolean",
+              "default": false
+            }
+          },
+          "required": []
+        },
+        "defaultLogBucket": {
+          "title": "Default Log Bucket",
+          "description": "Log Analytics on _Default log bucket.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "logAnalytics": {
+              "title": "Enable Log Analytics",
+              "description": "Enable Log Analytics on the log bucket to be able to write you own SQL queries on the logs in the _Default log bucket.",
+              "type": "boolean",
+              "default": false
+            }
+          },
+          "required": []
+        },
+        "kubernetes": {
+          "description": "Kubernetes specific parameters. In most cases, this can be ommitted. If nothing is set, App Factory will default to provisioning a Kubernetes namespace with the default application service account and sane defaults set.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "description": "Whether to create Kubernetes resources, such as a namespace and workload identity enabled service accounts etc.",
+              "type": "boolean",
+              "default": true
+            },
+            "cluster_group": {
+              "description": "If resources are to be deployed to clusters in a different group than the default shared clusters, such as Journey Planner clusters, this can be set (e.g. \"journeyPlanner\").",
+              "type": "string",
+              "default": "entur"
+            },
+            "cluster": {
+              "description": "Cluster prefix (?)",
+              "type": "string",
+              "default": "ent"
+            },
+            "networkPolicies": {
+              "title": "Kubernetes network policies",
+              "description": "Network policies can be used to control a Kubernetes pod's network ingress/egress traffic. This can usually be ommitted. If nothing is set, App Factory will provision default policies that should cover most common use cases.",
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": {
+                  "title": "Enable Kubernetes network policies",
+                  "description": "Whether to deploy (and enforce) any network policies set up by App Factory.",
+                  "type": "boolean",
+                  "default": true
+                },
+                "denyInternal": {
+                  "title": "Deny cross-namespace ingress traffic",
+                  "description": "Controls whether to admit ingress traffic to pods originating from other namespaces.",
+                  "type": "boolean",
+                  "default": true
+                },
+                "denyPublic": {
+                  "title": "Deny public ingress traffic",
+                  "description": "Controls whether to admit ingress traffic to pods originating from outside the cluster (via the ingress controller).",
+                  "type": "boolean",
+                  "default": false
+                },
+                "denyEgress": {
+                  "title": "Deny all egress traffic",
+                  "description": "Controls whether to admit egress traffic from pods.",
+                  "type": "boolean",
+                  "default": false
+                },
+                "ingress": {
+                  "title": "Ingress",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "allowedNamespaces": {
+                      "description": "A list of namespaces that pods are allowed to admit ingress traffic from.",
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": []
+                }
+              },
+              "required": []
+            }
+          },
+          "required": []
+        },
+        "network": {
+          "title": "Network",
+          "description": "Network configuration parameters for the Google Cloud project. In nearly all cases, this should be ommitted.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "sharedVpcEnabled": {
+              "description": "Whether to prepare the GCP project for use with shared VPC connections.",
+              "type": "boolean",
+              "default": true
+            }
+          },
+          "required": []
+        },
+        "terraform": {
+          "title": "Terraform",
+          "description": "Configures Terraform prerequisites such as remote state storage. This can be ommitted. If nothing is provided, App Factory will create a storage bucket for use with Terraform.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "createBackend": {
+              "description": "Provisions a Cloud Storage bucket for the application, with necessary RBAC permissions for developers and deployment tooling.",
+              "type": "boolean",
+              "default": true
+            }
+          },
+          "required": []
+        },
+        "legacy": {
+          "description": "NB!! Only used by the platform team when importing legacy project with non-standard name. Beware that when using `spec.legacy` you can only have one environment in `spec.environments` since `metadata.id` equals project id when legacy = True.",
+          "type": "boolean",
+          "default": false
+        },
+        "serviceAccounts": {
+          "type": "array",
+          "items": {
+            "title": "ServiceAccount",
+            "description": "App Factory will always provision a default application service account called `application`, with default roles set. To set up additional accounts or grant it additional roles, configure this block.",
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "title": "Service account ID",
+                "description": "A unique ID for the service account. Can be set to anything but `default` (reserved by the default account).",
+                "type": "string",
+                "not": {
+                  "const": "default"
+                }
+              },
+              "displayName": {
+                "title": "Service account display name",
+                "description": "A display name for the service account. Can be set to anything but `application` (reserved by the default account).",
+                "type": "string",
+                "not": {
+                  "const": "application"
+                }
+              },
+              "description": {
+                "title": "Service account description",
+                "description": "A rich description of the service account's purpose.",
+                "type": "string"
+              },
+              "additionalRoles": {
+                "title": "Additional Roles for the default service account (supplemental)",
+                "description": "List of additional roles to be granted the default application service account (`application`) on the application GCP project, in addition to default roles.",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "roles": {
+                "title": "Roles to grant the service account (authorative)",
+                "description": "List of roles to be granted on the application GCP project. Note that the list is authorative when set for the default application service account (`application`).",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "kubernetesEnabled": {
+                "type": "boolean"
+              }
+            },
+            "required": ["id", "displayName"]
+          }
+        },
+        "secretManager": {
+          "title": "SecretManager",
+          "description": "Secret Manager specific parameters. In most cases, this can be ommitted. If nothing is set, App Factory will default to provisioning a secretStore object in the Kubernetes namespace using the application service account and set the required IAM rules.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "title": "Enable Secret Manager",
+              "description": "Whether to create secretStore Kubernetes resources, and set IAM rules for the selected service account. The name of the secretstore is the application `name`.",
+              "type": "boolean",
+              "default": true
+            },
+            "serviceAccount": {
+              "title": "Service Account Used for Secret Manager",
+              "description": "Set the service account used for secret manager. Must match the `serviceAccounts.id` field. The `secretmanager.secretAccessor` role should not be added to the specified service accounts role list.",
+              "type": "string",
+              "default": "application"
+            }
+          },
+          "required": []
+        },
+        "auth0": {
+          "title": "Auth0",
+          "description": "Auth0 specific parameters. Enabling it for the internal client will provision secrets and trigger automatic creation of client credentials.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "internal": {
+              "title": "Internal",
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": {
+                  "title": "Enable creation of internal Auth0 client credentials",
+                  "description": "Whether to create Auth0 client credentials in 'internal' tenant.",
+                  "type": "boolean",
+                  "default": false
+                },
+                "type": {
+                  "title": "Auth0 client type",
+                  "description": "The type of client to create. In most cases, this should be left with the default setting.",
+                  "type": "string",
+                  "default": "m2m"
+                }
+              },
+              "required": []
+            }
+          },
+          "required": []
+        },
+        "repositories": {
+          "description": "List of GitHub repository names which are allowed to deploy resources to the application.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "quotas": {
+          "title": "Quotas",
+          "description": "By default App Factory will always set default quota for BigQuery usage. To change the default setting configure this block.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "description": "Set this to false to disable provisioning of project quotas.",
+              "type": "boolean",
+              "default": true
+            },
+            "bigQuery": {
+              "title": "BigQuery Quota settings",
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "dailyQuotaPerUser": {
+                  "title": "Daily BigQuery quota per user per Google project in terrabyte",
+                  "description": "Specified in tebibytes, default is 10 TiB. For lower then 1TiB quota use ie \"0.1\"",
+                  "type": "number",
+                  "default": 10,
+                  "anyOf": [{ "const": -1 }, { "const": 0 }, { "minimum": 0 }]
+                },
+                "dailyQuota": {
+                  "title": "Daily BigQuery quota per Google project in terrabyte",
+                  "description": "Specified in tebibytes, default is -1, (unlimited). For lower then 1iTB quota use ie \"0.1\"",
+                  "type": "number",
+                  "default": -1,
+                  "anyOf": [{ "const": -1 }, { "const": 0 }, { "minimum": 0 }]
+                }
+              },
+              "required": []
+            }
+          },
+          "required": []
+        }
+      },
+      "required": ["organization", "environments"]
+    }
+  },
+  "required": ["apiVersion", "kind", "metadata", "spec"]
+}
